@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>LDC</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231a1208'/><text x='50' y='68' font-size='60' text-anchor='middle' fill='%23c8862a' font-family='Arial' font-weight='bold'>M</text></svg>">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+html,body { width:100%; height:100%; overflow:hidden; background:#0a0705; font-family:'Segoe UI',Tahoma,Arial,sans-serif; color:#e8dcc4; }
+#app { position:relative; width:100%; height:100%; }
+.screen { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center; }
+.screen.active { display:flex; animation:fadeIn .6s ease; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes flicker { 0%,100%{opacity:1} 45%{opacity:.6} 50%{opacity:.3} 55%{opacity:.8} 60%{opacity:.5} }
+@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+@keyframes slideUp { from{transform:translateY(30px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+/* ===== شاشة Studio M ===== */
+#screen-studio { background:#000; }
+#studio-logo { font-size:clamp(48px,12vw,120px); font-weight:900; letter-spacing:8px; color:#c8862a; text-shadow:0 0 30px #c8862a88, 0 0 60px #c8862a44; animation:flicker 2s infinite; }
+#studio-sub { margin-top:10px; font-size:14px; letter-spacing:6px; color:#8a6d3b; opacity:0; animation:slideUp 1s .5s forwards; }
+#studio-line { width:0; height:2px; background:linear-gradient(90deg,transparent,#c8862a,transparent); margin-top:20px; animation:grow 1.5s .8s forwards; }
+@keyframes grow { to{width:200px} }
+
+/* ===== شاشة الانتظار ===== */
+#screen-wait { background:radial-gradient(ellipse at center, #1a1208 0%, #000 100%); }
+#wait-title { font-size:clamp(60px,18vw,180px); font-weight:900; letter-spacing:12px; color:#c8862a; text-shadow:0 0 40px #c8862a66, 0 0 80px #c8862a33; animation:pulse 3s infinite; }
+#wait-sub { margin-top:20px; font-size:16px; color:#8a6d3b; letter-spacing:3px; }
+#wait-hint { position:absolute; bottom:60px; font-size:14px; color:#666; animation:flicker 2s infinite; }
+
+/* ===== القائمة الرئيسية ===== */
+#screen-menu { background:radial-gradient(ellipse at center, #1a1208 0%, #000 100%); }
+#menu-title { font-size:clamp(50px,14vw,130px); font-weight:900; letter-spacing:10px; color:#c8862a; text-shadow:0 0 30px #c8862a66; margin-bottom:10px; }
+#menu-tagline { font-size:14px; color:#8a6d3b; letter-spacing:2px; margin-bottom:50px; }
+.menu-btn { display:block; width:min(280px,80vw); padding:15px; margin:8px auto; background:linear-gradient(180deg,#2a1e0f,#1a1208); border:1px solid #c8862a55; color:#e8dcc4; font-size:18px; font-weight:600; letter-spacing:2px; border-radius:8px; cursor:pointer; transition:.25s; font-family:inherit; }
+.menu-btn:hover { background:linear-gradient(180deg,#3a2812,#2a1e0f); border-color:#c8862a; box-shadow:0 0 20px #c8862a44; transform:translateY(-2px); }
+.menu-btn:disabled { opacity:.3; cursor:not-allowed; }
+#menu-version { position:absolute; bottom:15px; font-size:11px; color:#555; }
+
+/* ===== الإعدادات ===== */
+#screen-settings, #screen-about { background:radial-gradient(ellipse at center, #1a1208 0%, #000 100%); }
+.setting-row { display:flex; align-items:center; justify-content:space-between; width:min(400px,90vw); padding:12px 0; border-bottom:1px solid #2a1e0f; }
+.setting-row label { font-size:16px; color:#c8b898; }
+.setting-row input[type=range] { width:140px; accent-color:#c8862a; }
+.setting-row select { background:#1a1208; color:#e8dcc4; border:1px solid #c8862a55; padding:6px 10px; border-radius:5px; font-family:inherit; }
+.setting-row input[type=checkbox] { width:22px; height:22px; accent-color:#c8862a; }
+.back-btn { margin-top:30px; padding:12px 40px; background:#1a1208; border:1px solid #c8862a55; color:#c8862a; border-radius:8px; cursor:pointer; font-size:16px; font-family:inherit; }
+.back-btn:hover { background:#2a1e0f; }
+.screen-title { font-size:28px; color:#c8862a; margin-bottom:30px; letter-spacing:4px; }
+#about-text { max-width:600px; line-height:1.9; color:#b8a888; font-size:15px; }
+#about-text b { color:#c8862a; }
+
+/* ===== شاشة اللعب ===== */
+#screen-game { padding:0; background:#000; }
+#gameCanvas { display:block; background:#000; touch-action:none; }
+#hud { position:absolute; top:0; left:0; right:0; padding:10px 15px; display:flex; justify-content:space-between; align-items:center; pointer-events:none; font-size:14px; text-shadow:0 0 5px #000; }
+#hud-fuses { color:#ffcc44; font-weight:bold; }
+#hud-timer { color:#c8b898; }
+#hud-candle { color:#ffaa33; }
+#hud-pause { pointer-events:auto; background:#1a1208aa; border:1px solid #c8862a55; color:#c8862a; width:38px; height:38px; border-radius:50%; cursor:pointer; font-size:16px; }
+#overlay-msg { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; background:#000a; z-index:10; }
+#overlay-msg.active { display:flex; }
+#overlay-msg h2 { font-size:32px; color:#c8862a; margin-bottom:20px; }
+#overlay-msg p { color:#b8a888; max-width:400px; line-height:1.8; margin-bottom:25px; }
+#overlay-msg button { padding:14px 40px; background:#1a1208; border:1px solid #c8862a; color:#c8862a; border-radius:8px; cursor:pointer; font-size:16px; font-family:inherit; }
+#overlay-msg button:hover { background:#2a1e0f; }
+
+/* ===== شاشة الفصل/السر ===== */
+#screen-chapter { background:#000; }
+#chapter-text { font-size:clamp(18px,4vw,26px); line-height:2.2; color:#c8b898; max-width:600px; opacity:0; }
+#chapter-ending { margin-top:40px; font-size:20px; color:#c8862a; letter-spacing:4px; opacity:0; }
+
+/* ===== شاشة الهزيمة ===== */
+#screen-lose { background:#0a0000; }
+#lose-title { font-size:clamp(30px,8vw,60px); color:#8b1a1a; letter-spacing:8px; text-shadow:0 0 30px #8b1a1a88; }
+#lose-sub { margin-top:20px; color:#666; font-size:16px; }
+
+.hidden { display:none !important; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== 1. Studio M ===== -->
+  <div id="screen-studio" class="screen active">
+    <div id="studio-logo">M</div>
+    <div id="studio-sub">STUDIO M</div>
+    <div id="studio-line"></div>
+  </div>
+
+  <!-- ===== 2. شاشة الانتظار ===== -->
+  <div id="screen-wait" class="screen">
+    <div id="wait-title">LDC</div>
+    <div id="wait-sub">قصة مصنع تحت الأرض</div>
+    <div id="wait-hint">اضغط في أي مكان للمتابعة</div>
+  </div>
+
+  <!-- ===== 3. القائمة ===== -->
+  <div id="screen-menu" class="screen">
+    <div id="menu-title">LDC</div>
+    <div id="menu-tagline">مصنع تحت الأرض لم يسمع به أحد</div>
+    <button class="menu-btn" id="btn-play">ابدأ اللعب</button>
+    <button class="menu-btn" id="btn-continue" disabled>متابعة الفصل 2</button>
+    <button class="menu-btn" id="btn-settings">الإعدادات</button>
+    <button class="menu-btn" id="btn-about">حول اللعبة</button>
+    <div id="menu-version">الإصدار 1.0 — الفصل الأول</div>
+  </div>
+
+  <!-- ===== 4. الإعدادات ===== -->
+  <div id="screen-settings" class="screen">
+    <div class="screen-title">الإعدادات</div>
+    <div class="setting-row"><label>الموسيقى</label><input type="range" id="set-music" min="0" max="100" value="50"></div>
+    <div class="setting-row"><label>المؤثرات الصوتية</label><input type="range" id="set-sfx" min="0" max="100" value="70"></div>
+    <div class="setting-row"><label>الصعوبة</label>
+      <select id="set-diff"><option value="easy">سهل</option><option value="normal" selected>عادي</option><option value="hard">مرعب</option></select>
+    </div>
+    <div class="setting-row"><label>اهتزاز الشاشة</label><input type="checkbox" id="set-shake" checked></div>
+    <button class="back-btn" onclick="showScreen('screen-menu')">رجوع</button>
+  </div>
+
+  <!-- ===== 5. حول ===== -->
+  <div id="screen-about" class="screen">
+    <div class="screen-title">حول اللعبة</div>
+    <div id="about-text">
+      <p><b>LDC</b> — قصة مصنع تحت الأرض مهجور، لم يسمع به أحد. شاب يهبط إلى الأعماق بدافع الفضول، وفجأة ينغلق المخرج خلفه…</p>
+      <p style="margin-top:20px">عليه أن يجمع <b>5 فتائل</b> لإضاءة الباب، ويهرب قبل أن ينطفئ ضوء الشمعة… وقبل أن يجده <b>الشيء</b> الذي يسكن هناك.</p>
+      <p style="margin-top:20px">لكن ما ينتظره في النهاية ليس الخروج… بل سر أعمق.</p>
+      <p style="margin-top:30px;font-size:12px;color:#555">Studio M — الإصدار 1.0</p>
+    </div>
+    <button class="back-btn" onclick="showScreen('screen-menu')">رجوع</button>
+  </div>
+
+  <!-- ===== 6. اللعب ===== -->
+  <div id="screen-game" class="screen">
+    <canvas id="gameCanvas"></canvas>
+    <div id="hud">
+      <div id="hud-fuses">فتائل: 0/5</div>
+      <div id="hud-candle">🕯️</div>
+      <div id="hud-timer">00:00</div>
+      <button id="hud-pause">⏸</button>
+    </div>
+    <div id="overlay-msg">
+      <h2 id="overlay-title"></h2>
+      <p id="overlay-text"></p>
+      <button id="overlay-btn">متابعة</button>
+    </div>
+  </div>
+
+  <!-- ===== 7. نهاية الفصل/السر ===== -->
+  <div id="screen-chapter" class="screen">
+    <div id="chapter-text"></div>
+    <div id="chapter-ending">يتبع…</div>
+  </div>
+
+  <!-- ===== 8. الهزيمة ===== -->
+  <div id="screen-lose" class="screen">
+    <div id="lose-title">وجدك…</div>
+    <div id="lose-sub">اضغط للمحاولة من جديد</div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// LDC — Chapter 1 | Studio M
+// ============================================================
+
+// ---------- إدارة الشاشات ----------
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ---------- انتقال Studio M ← انتظار ← قائمة ----------
+setTimeout(() => { showScreen('screen-wait'); }, 3000);
+
+document.getElementById('screen-wait').addEventListener('click', () => {
+  showScreen('screen-menu');
+  updateContinueBtn();
+});
+
+// ---------- الأزرار ----------
+document.getElementById('btn-play').onclick = () => startGame(1);
+document.getElementById('btn-settings').onclick = () => showScreen('screen-settings');
+document.getElementById('btn-about').onclick = () => showScreen('screen-about');
+
+// ---------- حفظ التقدم ----------
+function saveProgress(ch) { try { localStorage.setItem('ldc_progress', ch); } catch(e){} }
+function getProgress() { try { return parseInt(localStorage.getItem('ldc_progress')||'0'); } catch(e){ return 0; } }
+function updateContinueBtn() {
+  const p = getProgress();
+  const btn = document.getElementById('btn-continue');
+  if (p >= 2) { btn.disabled = false; btn.textContent = 'متابعة الفصل 2'; }
+  else if (p >= 1) { btn.disabled = false; btn.textContent = 'الفصل 2 (قريباً)'; }
+}
+updateContinueBtn();
+
+// ---------- الإعدادات ----------
+const settings = { music: 50, sfx: 70, diff: 'normal', shake: true };
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('ldc_settings')||'{}');
+    Object.assign(settings, s);
+    document.getElementById('set-music').value = settings.music;
+    document.getElementById('set-sfx').value = settings.sfx;
+    document.getElementById('set-diff').value = settings.diff;
+    document.getElementById('set-shake').checked = settings.shake;
+  } catch(e){}
+}
+function saveSettings() { try { localStorage.setItem('ldc_settings', JSON.stringify(settings)); } catch(e){} }
+loadSettings();
+document.getElementById('set-music').oninput = e => { settings.music = +e.target.value; saveSettings(); };
+document.getElementById('set-sfx').oninput = e => { settings.sfx = +e.target.value; saveSettings(); };
+document.getElementById('set-diff').onchange = e => { settings.diff = e.target.value; saveSettings(); };
+document.getElementById('set-shake').onchange = e => { settings.shake = e.target.checked; saveSettings(); };
+
+// ============================================================
+// محرك اللعبة
+// ============================================================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let W, H, TILE = 40;
+let game = null;
+let animId = null;
+let paused = false;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  TILE = Math.max(28, Math.min(48, Math.floor(Math.min(W, H) / 16)));
+}
+window.addEventListener('resize', resize);
+
+// ---------- إعدادات الصعوبة ----------
+const DIFF = {
+  easy:   { time: 240, enemySpeed: 1.0, viewRange: 4, candleDrain: 0.5 },
+  normal: { time: 180, enemySpeed: 1.4, viewRange: 6, candleDrain: 0.8 },
+  hard:   { time: 130, enemySpeed: 1.9, viewRange: 8, candleDrain: 1.1 }
+};
+
+// ---------- خريطة عشوائية ----------
+const MAP_W = 21, MAP_H = 21;
+function generateMap() {
+  const map = [];
+  for (let y=0; y<MAP_H; y++) {
+    map[y] = [];
+    for (let x=0; x<MAP_W; x++) map[y][x] = 1; // جدار
+  }
+  // حفر المتاهة (خوارزمية بسيطة: غرف عشوائية + ممرات)
+  function carveRoom(x, y, w, h) {
+    for (let j=y; j<y+h; j++) for (let i=x; i<x+w; i++) {
+      if (i>0 && i<MAP_W-1 && j>0 && j<MAP_H-1) map[j][i] = 0;
+    }
+  }
+  // غرف
+  const rooms = [];
+  for (let i=0; i<8; i++) {
+    const w = 3 + Math.floor(Math.random()*3);
+    const h = 3 + Math.floor(Math.random()*3);
+    const x = 2 + Math.floor(Math.random()*(MAP_W-w-4));
+    const y = 2 + Math.floor(Math.random()*(MAP_H-h-4));
+    carveRoom(x, y, w, h);
+    rooms.push({ x, y, w, h, cx: x+Math.floor(w/2), cy: y+Math.floor(h/2) });
+  }
+  // ربط الغرف بممرات
+  for (let i=1; i<rooms.length; i++) {
+    const a = rooms[i-1], b = rooms[i];
+    let x = a.cx, y = a.cy;
+    while (x !== b.cx) { map[y][x] = 0; x += x < b.cx ? 1 : -1; }
+    while (y !== b.cy) { map[y][x] = 0; y += y < b.cy ? 1 : -1; }
+  }
+  return { map, rooms };
+}
+
+function startGame(chapter) {
+  resize();
+  const cfg = DIFF[settings.diff] || DIFF.normal;
+  const { map, rooms } = generateMap();
+
+  // موضع اللاعب في الغرفة الأولى
+  const startRoom = rooms[0];
+  const player = { x: startRoom.cx, y: startRoom.cy, r: 10, speed: 0.18 };
+
+  // موضع العدو في أبعد غرفة
+  const farRoom = rooms[rooms.length-1];
+  const enemy = { x: farRoom.cx, y: farRoom.cy, r: 11, speed: cfg.enemySpeed, state: 'wander', target: null, lastSeen: null, wanderTimer: 0 };
+
+  // الفتائل في غرف عشوائية
+  const fuses = [];
+  const usedRooms = new Set([0, rooms.length-1]);
+  const shuffled = rooms.map((r,i)=>i).filter(i=>!usedRooms.has(i)).sort(()=>Math.random()-0.5);
+  for (let i=0; i<5; i++) {
+    const r = rooms[shuffled[i]];
+    fuses.push({ x: r.cx + (Math.random()-0.5)*1.5, y: r.cy + (Math.random()-0.5)*1.5, r: 12, collected: false, glow: Math.random()*Math.PI*2 });
+  }
+
+  // باب الخروج
+  const exitRoom = rooms[rooms.length-1];
+  const exit = { x: exitRoom.cx, y: exitRoom.cy, r: 16, open: false };
+
+  game = {
+    map, player, enemy, fuses, exit,
+    timeLeft: cfg.time, maxTime: cfg.time, candleDrain: cfg.candleDrain,
+    candle: 100, viewRange: cfg.viewRange,
+    fusesCollected: 0, running: true, won: false, lost: false,
+    shake: 0, heart: 0, chapter, particles: [], noise: 0
+  };
+
+  paused = false;
+  document.getElementById('overlay-msg').classList.remove('active');
+  updateHUD();
+  showScreen('screen-game');
+  if (animId) cancelAnimationFrame(animId);
+  lastTime = performance.now();
+  loop(lastTime);
+}
+
+// ---------- تحديث HUD ----------
+function updateHUD() {
+  document.getElementById('hud-fuses').textContent = `فتائل: ${game.fusesCollected}/5`;
+  const m = Math.floor(game.timeLeft/60), s = Math.floor(game.timeLeft%60);
+  document.getElementById('hud-timer').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  document.getElementById('hud-candle').textContent = '🕯️ ' + Math.ceil(game.candle) + '%';
+}
+
+// ---------- الإدخال ----------
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+let touchStart = null;
+canvas.addEventListener('touchstart', e => { const t = e.touches[0]; touchStart = { x: t.clientX, y: t.clientY }; }, {passive:true});
+canvas.addEventListener('touchmove', e => {
+  if (!touchStart || !game) return;
+  const t = e.touches[0];
+  const dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+  if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+    if (Math.abs(dx) > Math.abs(dy)) { keys['arrowright'] = dx > 0; keys['arrowleft'] = dx < 0; }
+    else { keys['arrowdown'] = dy > 0; keys['arrowup'] = dy < 0; }
+  }
+}, {passive:true});
+canvas.addEventListener('touchend', () => { touchStart = null; keys['arrowright']=keys['arrowleft']=keys['arrowup']=keys['arrowdown']=false; }, {passive:true});
+
+document.getElementById('hud-pause').onclick = () => {
+  if (!game || !game.running) return;
+  paused = !paused;
+  if (paused) {
+    showOverlay('تم الإيقاف', 'اللعبة متوقفة. اضغط للمتابعة.', 'متابعة', () => {
+      document.getElementById('overlay-msg').classList.remove('active'); paused = false;
+    });
+  }
+};
+
+function showOverlay(title, text, btnText, cb) {
+  document.getElementById('overlay-title').textContent = title;
+  document.getElementById('overlay-text').textContent = text;
+  const btn = document.getElementById('overlay-btn');
+  btn.textContent = btnText;
+  btn.onclick = cb;
+  document.getElementById('overlay-msg').classList.add('active');
+}
+
+// ---------- حركة ----------
+function isWall(x, y) {
+  const tx = Math.floor(x), ty = Math.floor(y);
+  if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return true;
+  return game.map[ty][tx] === 1;
+}
+
+function tryMove(obj, dx, dy) {
+  const nx = obj.x + dx, ny = obj.y + dy;
+  if (!isWall(nx, obj.y)) obj.x = nx;
+  if (!isWall(obj.x, ny)) obj.y = ny;
+}
+
+function dist(a, b) { return Math.hypot(a.x-b.x, a.y-b.y); }
+
+function hasLineOfSight(ax, ay, bx, by) {
+  const steps = Math.ceil(Math.hypot(bx-ax, by-ay) * 3);
+  for (let i=1; i<steps; i++) {
+    const t = i/steps;
+    if (isWall(ax+(bx-ax)*t, ay+(by-ay)*t)) return false;
+  }
+  return true;
+}
+
+// ---------- منطق العدو ----------
+function updateEnemy(dt) {
+  const e = game.enemy, p = game.player;
+  const d = dist(e, p);
+  const los = hasLineOfSight(e.x, e.y, p.x, p.y);
+
+  // هل يشوف اللاعب؟
+  const sees = los && d < game.viewRange;
+  const hears = d < 2.5 + game.noise * 3;
+
+  if (sees || hears) {
+    e.state = 'chase';
+    e.lastSeen = { x: p.x, y: p.y };
+    e.target = { x: p.x, y: p.y };
+  } else if (e.state === 'chase' && e.lastSeen) {
+    if (dist(e, e.lastSeen) < 0.5) { e.state = 'wander'; e.lastSeen = null; e.target = null; }
+    else e.target = e.lastSeen;
+  } else {
+    e.state = 'wander';
+    e.wanderTimer -= dt;
+    if (e.wanderTimer <= 0 || !e.target) {
+      e.wanderTimer = 2 + Math.random()*3;
+      e.target = { x: e.x + (Math.random()-0.5)*8, y: e.y + (Math.random()-0.5)*8 };
+    }
+  }
+
+  // الحركة نحو الهدف
+  if (e.target) {
+    const dx = e.target.x - e.x, dy = e.target.y - e.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 0.3) {
+      const sp = e.speed * (e.state === 'chase' ? 1.3 : 0.6) * dt * 0.06;
+      tryMove(e, (dx/len)*sp, 0);
+      tryMove(e, 0, (dy/len)*sp);
+    }
+  }
+
+  // التقاط اللاعب
+  if (d < 0.7) loseGame();
+}
+
+// ---------- اللوب ----------
+let lastTime = 0;
+function loop(now) {
+  const dt = Math.min(50, now - lastTime) / 1000;
+  lastTime = now;
+  if (game && game.running && !paused) update(dt);
+  render();
+  if (game) animId = requestAnimationFrame(loop);
+}
+
+function update(dt) {
+  const p = game.player;
+
+  // حركة اللاعب
+  let dx = 0, dy = 0;
+  const sp = p.speed * 60 * dt;
+  if (keys['w'] || keys['arrowup']) dy -= sp;
+  if (keys['s'] || keys['arrowdown']) dy += sp;
+  if (keys['a'] || keys['arrowleft']) dx -= sp;
+  if (keys['d'] || keys['arrowright']) dx += sp;
+  if (dx && dy) { dx *= 0.707; dy *= 0.707; }
+  if (dx || dy) {
+    tryMove(p, dx, 0); tryMove(p, 0, dy);
+    game.noise = Math.min(1, game.noise + dt*2);
+  } else {
+    game.noise = Math.max(0, game.noise - dt*1.5);
+  }
+
+  // المؤقت
+  game.timeLeft -= dt;
+  if (game.timeLeft <= 0) { loseGame('انتهى الوقت'); return; }
+
+  // الشمعة
+  game.candle -= game.candleDrain * dt;
+  if (game.candle <= 0) { game.candle = 0; loseGame('انطفأت الشمعة'); return; }
+
+  // الفتائل
+  for (const f of game.fuses) {
+    if (!f.collected) {
+      f.glow += dt * 2;
+      if (dist(p, f) < 0.6) {
+        f.collected = true;
+        game.fusesCollected++;
+        game.timeLeft += 20; // مكافأة وقت
+        updateHUD();
+        for (let i=0; i<12; i++) game.particles.push({ x:f.x, y:f.y, vx:(Math.random()-0.5)*2, vy:(Math.random()-0.5)*2, life:1, color:'#ffcc44' });
+      }
+    }
+  }
+
+  // الباب
+  game.exit.open = game.fusesCollected >= 5;
+  if (game.exit.open && dist(p, game.exit) < 1) { winGame(); return; }
+
+  // العدو
+  updateEnemy(dt);
+
+  // القلب / الاهتزاز
+  const d = dist(p, game.enemy);
+  game.heart = Math.max(0, 1 - d / 6);
+  if (d < 3 && settings.shake) game.shake = Math.min(1, game.shake + dt*3);
+  else game.shake = Math.max(0, game.shake - dt*2);
+
+  // الجزيئات
+  for (let i=game.particles.length-1; i>=0; i--) {
+    const pt = game.particles[i];
+    pt.x += pt.vx*dt; pt.y += pt.vy*dt; pt.life -= dt*1.5;
+    if (pt.life <= 0) game.particles.splice(i,1);
+  }
+
+  updateHUD();
+}
+
+// ---------- النهاية ----------
+function loseGame(reason) {
+  if (!game || game.lost) return;
+  game.lost = true; game.running = false;
+  const r = reason || 'وجدك الشيء';
+  setTimeout(() => {
+    const loseScreen = document.getElementById('screen-lose');
+    loseScreen.querySelector('#lose-title').textContent = r;
+    showScreen('screen-lose');
+    loseScreen.onclick = () => { loseScreen.onclick = null; startGame(game.chapter); };
+  }, 400);
+}
+
+function winGame() {
+  if (!game || game.won) return;
+  game.won = true; game.running = false;
+  saveProgress(1);
+  setTimeout(() => playChapterEnding(), 300);
+}
+
+// ---------- مشهد نهاية الفصل ----------
+function playChapterEnding() {
+  showScreen('screen-chapter');
+  const textEl = document.getElementById('chapter-text');
+  const endEl = document.getElementById('chapter-ending');
+  textEl.textContent = '';
+  endEl.style.opacity = 0;
+  textEl.style.opacity = 1;
+
+  const lines = [
+    'فتحت الباب… وخرجت.',
+    'الهواء البارد يلمس وجهك. الشمس…',
+    'لكن حين استدرت…',
+    'لم يكن المخرج الذي دخلت منه.',
+    'كان مصنعاً آخر. أعمق.',
+    'وصوت صرير معدني خلفك…',
+    'ثم يدٌ ممدودة من الظلام…'
+  ];
+
+  let i = 0;
+  const timer = setInterval(() => {
+    if (i >= lines.length) {
+      clearInterval(timer);
+      endEl.style.transition = 'opacity 1.5s';
+      endEl.style.opacity = 1;
+      setTimeout(() => {
+        showScreen('screen-menu');
+        updateContinueBtn();
+      }, 3500);
+      return;
+    }
+    textEl.textContent = lines[i];
+    textEl.style.opacity = 0;
+    void textEl.offsetWidth;
+    textEl.style.transition = 'opacity .6s';
+    textEl.style.opacity = 1;
+    i++;
+  }, 2200);
+}
+
+// ============================================================
+// الرسم
+// ============================================================
+function render() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  if (!game) return;
+
+  const p = game.player;
+
+  // اهتزاز
+  let ox = 0, oy = 0;
+  if (game.shake > 0) {
+    ox = (Math.random()-0.5) * game.shake * 12;
+    oy = (Math.random()-0.5) * game.shake * 12;
+  }
+
+  // الكاميرا تتبع اللاعب
+  const camX = p.x * TILE - W/2 + ox;
+  const camY = p.y * TILE - H/2 + oy;
+
+  ctx.save();
+  ctx.translate(-camX, -camY);
+
+  // الأرضية والجدران
+  const startX = Math.max(0, Math.floor(camX/TILE) - 1);
+  const endX = Math.min(MAP_W, Math.ceil((camX+W)/TILE) + 1);
+  const startY = Math.max(0, Math.floor(camY/TILE) - 1);
+  const endY = Math.min(MAP_H, Math.ceil((camY+H)/TILE) + 1);
+
+  for (let y=startY; y<endY; y++) {
+    for (let x=startX; x<endX; x++) {
+      if (game.map[y][x] === 1) {
+        ctx.fillStyle = '#2a1e0f';
+        ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
+        ctx.fillStyle = '#1a1208';
+        ctx.fillRect(x*TILE+2, y*TILE+2, TILE-4, TILE-4);
+      } else {
+        ctx.fillStyle = '#0e0a06';
+        ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
+        if ((x+y)%3 === 0) {
+          ctx.fillStyle = '#15100a';
+          ctx.fillRect(x*TILE+TILE*0.3, y*TILE+TILE*0.4, TILE*0.3, TILE*0.15);
+        }
+      }
+    }
+  }
+
+  // ضوء الشمعة (دائرة مضيئة حول اللاعب)
+  const lightR = TILE * (1.5 + game.candle/100 * 3);
+  const grad = ctx.createRadialGradient(p.x*TILE, p.y*TILE, TILE*0.5, p.x*TILE, p.y*TILE, lightR);
+  grad.addColorStop(0, 'rgba(255,180,80,0.15)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(camX-100, camY-100, W+200, H+200);
+
+  // الباب
+  const ex = game.exit;
+  ctx.save();
+  ctx.translate(ex.x*TILE, ex.y*TILE);
+  ctx.fillStyle = ex.open ? '#c8862a' : '#3a2812';
+  ctx.fillRect(-TILE*0.5, -TILE*0.7, TILE, TILE*1.4);
+  if (ex.open) {
+    ctx.shadowColor = '#c8862a'; ctx.shadowBlur = 30;
+    ctx.fillStyle = 'rgba(255,200,100,0.4)';
+    ctx.fillRect(-TILE*0.4, -TILE*0.6, TILE*0.8, TILE*1.2);
+    ctx.shadowBlur = 0;
+  }
+  ctx.restore();
+
+  // الفتائل
+  for (const f of game.fuses) {
+    if (f.collected) continue;
+    ctx.save();
+    ctx.translate(f.x*TILE, f.y*TILE);
+    const s = 1 + Math.sin(f.glow)*0.15;
+    ctx.scale(s, s);
+    ctx.shadowColor = '#ffcc44'; ctx.shadowBlur = 15;
+    ctx.fillStyle = '#ffcc44';
+    ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-2, -2, 2, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // الجزيئات
+  for (const pt of game.particles) {
+    ctx.globalAlpha = pt.life;
+    ctx.fillStyle = pt.color;
+    ctx.beginPath(); ctx.arc(pt.x*TILE, pt.y*TILE, 3, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // العدو
+  const e = game.enemy;
+  const ed = dist(p, e);
+  if (ed < game.viewRange + 3 || hasLineOfSight(e.x, e.y, p.x, p.y)) {
+    ctx.save();
+    ctx.translate(e.x*TILE, e.y*TILE);
+    // هالة حمراء
+    const eg = ctx.createRadialGradient(0,0,0,0,0,TILE*2);
+    eg.addColorStop(0, 'rgba(139,26,26,0.4)');
+    eg.addColorStop(1, 'rgba(139,26,26,0)');
+    ctx.fillStyle = eg;
+    ctx.fillRect(-TILE*2, -TILE*2, TILE*4, TILE*4);
+    // الجسم
+    ctx.shadowColor = '#8b1a1a'; ctx.shadowBlur = 20;
+    ctx.fillStyle = '#1a0808';
+    ctx.beginPath(); ctx.arc(0, 0, e.r, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#8b1a1a';
+    ctx.beginPath(); ctx.arc(-3, -3, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(3, -3, 3, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // اللاعب
+  ctx.save();
+  ctx.translate(p.x*TILE, p.y*TILE);
+  ctx.shadowColor = '#c8862a'; ctx.shadowBlur = 12;
+  ctx.fillStyle = '#e8dcc4';
+  ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#c8862a';
+  ctx.beginPath(); ctx.arc(0, 0, p.r*0.5, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  ctx.restore();
+
+  // تأثير الظلام (فينيت)
+  const vg = ctx.createRadialGradient(W/2, H/2, Math.min(W,H)*0.2, W/2, H/2, Math.max(W,H)*0.7);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.85)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+
+  // تأثير نبض القلب
+  if (game.heart > 0.3) {
+    ctx.strokeStyle = `rgba(139,26,26,${game.heart * 0.4})`;
+    ctx.lineWidth = 8;
+    ctx.strokeRect(4, 4, W-8, H-8);
+  }
+}
+</script>
+</body>
+</html>
